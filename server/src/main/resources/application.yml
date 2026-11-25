@@ -1,0 +1,71 @@
+spring:
+  application:
+    name: satlas-server
+
+  # ---- MySQL ----
+  datasource:
+    url: ${DB_URL:jdbc:mysql://localhost:3306/satlas?createDatabaseIfNotExist=true&useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Tokyo}
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD:}
+  jpa:
+    hibernate:
+      ddl-auto: update
+    open-in-view: false
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: Asia/Tokyo
+
+  # ---- PDF アップロード ----
+  servlet:
+    multipart:
+      max-file-size: 20MB
+      max-request-size: 20MB
+
+  # ---- Discord OAuth2 ----
+  security:
+    oauth2:
+      client:
+        registration:
+          discord:
+            client-id: ${DISCORD_CLIENT_ID:set-discord-client-id}
+            client-secret: ${DISCORD_CLIENT_SECRET:set-discord-client-secret}
+            client-name: Discord
+            client-authentication-method: client_secret_post
+            authorization-grant-type: authorization_code
+            redirect-uri: "{baseUrl}/login/oauth2/code/{registrationId}"
+            scope: identify,email,guilds
+        provider:
+          discord:
+            authorization-uri: https://discord.com/oauth2/authorize
+            token-uri: https://discord.com/api/oauth2/token
+            user-info-uri: https://discord.com/api/users/@me
+            user-name-attribute: id
+
+server:
+  port: ${PORT:8080}
+
+satlas:
+  # ログイン成功／失敗後のリダイレクト先
+  frontend-url: ${SATLAS_FRONTEND_URL:http://localhost:5173}
+  cors:
+    allowed-origins: ${SATLAS_CORS_ORIGINS:http://localhost:5173}
+  discord:
+    # DISCORD_CLIENT_ID が設定されている場合、SATLAS_DEV_MODE 未指定なら dev-mode は自動的に false
+    client-id: ${DISCORD_CLIENT_ID:}
+    # 空の場合はギルド所属チェックをスキップ
+    guild-id: ${DISCORD_GUILD_ID:}
+  security:
+    # 空（未指定）: DISCORD_CLIENT_ID が未設定なら true、設定済みなら false。明示指定(true/false)が最優先
+    dev-mode: ${SATLAS_DEV_MODE:}
+  gemini:
+    # ユーザー個別のキーが未設定の場合に使う共通キー
+    api-key: ${GEMINI_API_KEY:}
+    model: ${GEMINI_MODEL:gemini-2.5-flash}
+    base-url: https://generativelanguage.googleapis.com/v1beta
+  crypto:
+    # 個人 API キー暗号化用シークレット（本番環境では必ず環境変数 SATLAS_CRYPTO_SECRET を設定）
+    secret: ${SATLAS_CRYPTO_SECRET:satlas-dev-default-crypto-secret-change-me}
+  ollama:
+    default-base-url: ${OLLAMA_BASE_URL:http://localhost:11434}
+    default-model: ${OLLAMA_MODEL:gemma4:12b}
