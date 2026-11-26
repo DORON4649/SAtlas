@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
-import { Bot, Calendar, FileUp, KeyRound, Layers, Lock, Unlock, Wrench } from 'lucide-react';
+import { BookOpen, Bot, Calendar, FileUp, KeyRound, Layers, Lock, Unlock, Wrench } from 'lucide-react';
 import AiAssistantPanel from './components/ai/AiAssistantPanel';
 import AiSettingsModal from './components/ai/AiSettingsModal';
 import CalendarSidePanel from './components/calendar/CalendarSidePanel';
@@ -9,6 +9,8 @@ import Dashboard from './components/dashboard/Dashboard';
 import AppHeader from './components/layout/AppHeader';
 import ThreePaneShell from './components/layout/ThreePaneShell';
 import type { NavSection, ViewMode } from './components/layout/shellTypes';
+import NotebookExplorer from './components/notebook/NotebookExplorer';
+import NotebookWorkspace from './components/notebook/NotebookWorkspace';
 import PdfImportModal from './components/timetable/PdfImportModal';
 import WeeklyTimetable from './components/timetable/WeeklyTimetable';
 import AssignmentsWidget from './components/widgets/AssignmentsWidget';
@@ -16,6 +18,7 @@ import MemoWidget from './components/widgets/MemoWidget';
 import { useAuth } from './hooks/useAuth';
 import { loadOfflineIcalUrl, useCalendar } from './hooks/useCalendar';
 import { useDashboardLayout } from './hooks/useDashboardLayout';
+import { useNotes } from './hooks/useNotes';
 import { useTimetable } from './hooks/useTimetable';
 import {
   DEFAULT_LAYERS,
@@ -23,6 +26,7 @@ import {
   type CalendarLayerFilter,
   type CalendarViewMode,
 } from './lib/calendar';
+import type { LectureNote } from './types';
 
 const VIEW_MODE_KEY = 'satlas_view_mode';
 
@@ -50,6 +54,65 @@ export default function App() {
 
   const visibleRange = useMemo(() => getVisibleRange(anchorDate, calendarView), [anchorDate, calendarView]);
   const calendar = useCalendar(visibleRange.start, visibleRange.end);
+
+  // 講義ノート状態
+  const lectureNotes = useNotes();
+  const [selectedNoteId, setSelectedNoteId] = useState<number | null>(null);
+  const [activeNoteDraft, setActiveNoteDraft] = useState<LectureNote | null>(null);
+
+  const timetableSubjects = useMemo(() => {
+    const set = new Set<string>();
+    for (const entry of timetable.entries) {
+      if (entry.subject.trim()) set.add(entry.subject.trim());
+    }
+    return Array.from(set);
+  }, [timetable.entries]);
+
+  const selectedNote = useMemo(() => {
+    if (lectureNotes.notes.length === 0) return null;
+    if (selectedNoteId !== null) {
+      const found = lectureNotes.notes.find((n) => n.id === selectedNoteId);
+      if (found) return found;
+    }
+    return lectureNotes.notes[0];
+  }, [lectureNotes.notes, selectedNoteId]);
+
+  const activeNoteForAi =
+    section === 'notes'
+      ? activeNoteDraft && selectedNote && activeNoteDraft.id === selectedNote.id
+        ? activeNoteDraft
+        : selectedNote
+      : null;
+
+  const handleCreateNote = useCallback(
+    async (subjectName: string) => {
+      const created = await lectureNotes.createNote({
+        subjectName: subjectName || '未分類',
+        title: '新しい講義ノート',
+        contentMarkdown: `# ${subjectName || '講義'} メモ\n\n`,
+      });
+      setSelectedNoteId(created.id);
+    },
+    [lectureNotes],
+  );
+
+  const handleTogglePinNote = useCallback(
+    async (note: LectureNote) => {
+      await lectureNotes.updateNote(note.id, { isPinned: !note.isPinned });
+    },
+    [lectureNotes],
+  );
+
+  const handleDeleteNote = useCallback(
+    async (note: LectureNote) => {
+      if (!window.confirm(`ノート「${note.title}」を削除しますか？`)) return;
+      await lectureNotes.deleteNote(note.id);
+      if (selectedNoteId === note.id) {
+        setSelectedNoteId(null);
+      }
+    },
+    [lectureNotes, selectedNoteId],
+  );
 
   const currentUser = auth.status === 'ready' ? auth.user : null;
   const googleIcalUrl = currentUser?.googleIcalUrl ?? loadOfflineIcalUrl();
@@ -112,6 +175,19 @@ export default function App() {
           <div className={panel}>
             <AssignmentsWidget isEditing={false} />
           </div>
+        );
+      case 'notes':
+        return (
+          <NotebookWorkspace
+            key={selectedNote?.id ?? 'empty'}
+            note={selectedNote}
+            subjectOptions={timetableSubjects}
+            offline={lectureNotes.offline}
+            onSave={lectureNotes.updateNote}
+            onCreateNew={() => void handleCreateNote(timetableSubjects[0] ?? '未分類')}
+            onDelete={(n) => void handleDeleteNote(n)}
+            onDraftChange={setActiveNoteDraft}
+          />
         );
       case 'memos':
         return (
@@ -194,7 +270,11 @@ export default function App() {
         </>
       ) : (
         <>
-          <AiAssistantPanel user={currentUser} onOpenSettings={() => setAiSettingsOpen(true)} />
+          <AiAssistantPanel
+            user={currentUser}
+            onOpenSettings={() => setAiSettingsOpen(true)}
+            activeNote={activeNoteForAi}
+          />
 
           <div className="rounded-xl border border-slate-800 bg-slate-900 p-3">
             <h3 className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-slate-300">
@@ -202,6 +282,14 @@ export default function App() {
               クイックアクション
             </h3>
             <div className="space-y-1.5">
+              <button
+                type="button"
+                onClick={() => setSection('notes')}
+                className="flex w-full items-center gap-2 rounded-lg bg-slate-800 px-3 py-2 text-xs text-slate-200 transition hover:bg-slate-700"
+              >
+                <BookOpen className="h-3.5 w-3.5 text-cyan-300" />
+                講義ノートブックを開く
+              </button>
               <button
                 type="button"
                 onClick={() => setSection('calendar')}
@@ -267,7 +355,26 @@ export default function App() {
       )}
 
       {viewMode === 'three-pane' ? (
-        <ThreePaneShell activeSection={section} onSectionChange={setSection} tools={tools}>
+        <ThreePaneShell
+          activeSection={section}
+          onSectionChange={setSection}
+          leftSubPane={
+            section === 'notes' ? (
+              <NotebookExplorer
+                notes={lectureNotes.notes}
+                timetableSubjects={timetableSubjects}
+                selectedNoteId={selectedNote?.id ?? null}
+                offline={lectureNotes.offline}
+                loading={lectureNotes.loading}
+                onSelectNote={setSelectedNoteId}
+                onCreateNote={(subject) => void handleCreateNote(subject)}
+                onTogglePin={(n) => void handleTogglePinNote(n)}
+                onDeleteNote={(n) => void handleDeleteNote(n)}
+              />
+            ) : undefined
+          }
+          tools={tools}
+        >
           {workspace}
         </ThreePaneShell>
       ) : (

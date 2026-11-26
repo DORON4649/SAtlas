@@ -1,11 +1,26 @@
 import { useEffect, useRef, useState } from 'react';
-import { Bot, CalendarDays, ClipboardList, Cpu, KeyRound, LoaderCircle, Send, Sparkles } from 'lucide-react';
+import {
+  BookOpen,
+  Bot,
+  CalendarDays,
+  ClipboardList,
+  Code2,
+  Cpu,
+  FileText,
+  HelpCircle,
+  KeyRound,
+  LoaderCircle,
+  Send,
+  Sparkles,
+} from 'lucide-react';
 import { api, errorMessage } from '../../lib/api';
-import type { AiChatResponse, AiContextType, AiProvider, CurrentUser } from '../../types';
+import type { AiChatResponse, AiContextType, AiProvider, CurrentUser, LectureNote } from '../../types';
 
 interface Props {
   user: CurrentUser | null;
   onOpenSettings: () => void;
+  /** ノート画面を開いているとき、現在編集・閲覧中のノートを渡す */
+  activeNote?: LectureNote | null;
 }
 
 interface ChatMessage {
@@ -17,51 +32,85 @@ interface ChatMessage {
   model?: string;
 }
 
-const CONTEXT_CHIPS: { type: Exclude<AiContextType, 'NONE'>; label: string; icon: typeof CalendarDays }[] = [
+const BASE_CONTEXT_CHIPS: { type: Exclude<AiContextType, 'NONE' | 'NOTEBOOK'>; label: string; icon: typeof CalendarDays }[] = [
   { type: 'TODAY_SCHEDULE', label: '今日の時間割', icon: CalendarDays },
   { type: 'ASSIGNMENTS', label: '未完了課題', icon: ClipboardList },
 ];
 
+const NOTE_QUICK_PROMPTS: { label: string; prompt: string; icon: typeof FileText }[] = [
+  {
+    label: 'ノートの要約',
+    prompt: 'この講義ノートの要点を箇条書きで分かりやすく要約してください。',
+    icon: FileText,
+  },
+  {
+    label: '数式・コード解説',
+    prompt: 'この講義ノートに含まれる数式やコードセルの意味・動作をステップごとに解説してください。',
+    icon: Code2,
+  },
+  {
+    label: '確認クイズ作成',
+    prompt: 'この講義ノートの内容から理解度確認クイズを3問（解答と解説付き）作成してください。',
+    icon: HelpCircle,
+  },
+];
+
 /** 右サイドパネル常駐の AI アシスタント */
-export default function AiAssistantPanel({ user, onOpenSettings }: Props) {
+export default function AiAssistantPanel({ user, onOpenSettings, activeNote = null }: Props) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
   const [contextType, setContextType] = useState<AiContextType>('NONE');
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const msgSeqRef = useRef(0);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, sending]);
 
+  const effectiveContext: AiContextType =
+    contextType === 'NOTEBOOK' && !activeNote ? 'NONE' : contextType;
+
   const toggleContext = (t: Exclude<AiContextType, 'NONE'>) =>
     setContextType((prev) => (prev === t ? 'NONE' : t));
 
-  const send = async () => {
-    const text = input.trim();
+  const sendMessage = async (overrideText?: string, overrideContext?: AiContextType) => {
+    const text = (overrideText ?? input).trim();
     if (!text || sending) return;
 
+    const targetContext = overrideContext ?? effectiveContext;
+
+    msgSeqRef.current += 1;
     const userMsg: ChatMessage = {
-      id: `u-${Date.now()}`,
+      id: `u-${msgSeqRef.current}`,
       role: 'user',
       content: text,
-      contextType,
+      contextType: targetContext,
     };
     setMessages((prev) => [...prev, userMsg]);
-    setInput('');
+    if (!overrideText) setInput('');
+    if (overrideContext) setContextType(overrideContext);
     setSending(true);
     setError(null);
 
     try {
-      const res = await api.post<AiChatResponse>('/api/ai/chat', {
+      const payload: Record<string, unknown> = {
         message: text,
-        contextType,
-      });
+        contextType: targetContext,
+      };
+      if (targetContext === 'NOTEBOOK' && activeNote) {
+        payload.noteId = activeNote.id;
+        payload.noteTitle = activeNote.title;
+        payload.noteContent = activeNote.contentMarkdown;
+      }
+
+      const res = await api.post<AiChatResponse>('/api/ai/chat', payload);
+      msgSeqRef.current += 1;
       setMessages((prev) => [
         ...prev,
         {
-          id: `a-${Date.now()}`,
+          id: `a-${msgSeqRef.current}`,
           role: 'assistant',
           content: res.reply,
           provider: res.provider,
@@ -114,14 +163,49 @@ export default function AiAssistantPanel({ user, onOpenSettings }: Props) {
         )}
       </div>
 
+      {/* ノート画面専用クイックプロンプト */}
+      {activeNote && (
+        <div className="space-y-1.5 border-b border-slate-800/80 bg-cyan-950/15 px-3 py-2">
+          <div className="flex items-center gap-1 text-[10px] font-medium text-cyan-300">
+            <BookOpen className="h-3 w-3 shrink-0" />
+            <span className="truncate">ノート連携: {activeNote.title || '無題のノート'}</span>
+          </div>
+          <div className="flex flex-wrap gap-1">
+            {NOTE_QUICK_PROMPTS.map(({ label, prompt, icon: Icon }) => (
+              <button
+                key={label}
+                type="button"
+                disabled={sending}
+                onClick={() => void sendMessage(prompt, 'NOTEBOOK')}
+                className="flex items-center gap-1 rounded-md border border-cyan-500/30 bg-cyan-500/10 px-2 py-1 text-[10px] font-medium text-cyan-200 transition hover:bg-cyan-500/20 disabled:opacity-40"
+              >
+                <Icon className="h-3 w-3" />
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* メッセージ一覧 */}
       <div className="min-h-0 flex-1 space-y-2.5 overflow-y-auto p-3 text-xs">
         {messages.length === 0 && (
           <div className="space-y-2 rounded-lg border border-dashed border-slate-800 p-3 text-[11px] leading-relaxed text-slate-400">
-            <p>下のチップで「今日の時間割」や「未完了課題」を添付して質問できます。</p>
-            <p className="text-[10px] text-slate-500">
-              例：「今日の空きコマでどの課題を進めるべき？」
-            </p>
+            {activeNote ? (
+              <>
+                <p>上のクイックボタンや「開いているノートを含める」チップを使って、講義ノートの要約・解説・クイズ作成ができます。</p>
+                <p className="text-[10px] text-slate-500">
+                  例：「このノートの数式の導出過程をわかりやすく教えて」
+                </p>
+              </>
+            ) : (
+              <>
+                <p>下のチップで「今日の時間割」や「未完了課題」を添付して質問できます。</p>
+                <p className="text-[10px] text-slate-500">
+                  例：「今日の空きコマでどの課題を進めるべき？」
+                </p>
+              </>
+            )}
           </div>
         )}
 
@@ -175,12 +259,26 @@ export default function AiAssistantPanel({ user, onOpenSettings }: Props) {
         className="space-y-2 border-t border-slate-800 p-2.5"
         onSubmit={(e) => {
           e.preventDefault();
-          void send();
+          void sendMessage();
         }}
       >
         <div className="flex flex-wrap items-center gap-1.5">
-          {CONTEXT_CHIPS.map(({ type, label, icon: Icon }) => {
-            const active = contextType === type;
+          {activeNote && (
+            <button
+              type="button"
+              onClick={() => toggleContext('NOTEBOOK')}
+              className={`flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-medium transition ${
+                effectiveContext === 'NOTEBOOK'
+                  ? 'border-cyan-500/50 bg-cyan-600/25 text-cyan-200'
+                  : 'border-slate-700 bg-slate-800/70 text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              <BookOpen className="h-3 w-3" />
+              開いているノートを含める
+            </button>
+          )}
+          {BASE_CONTEXT_CHIPS.map(({ type, label, icon: Icon }) => {
+            const active = effectiveContext === type;
             return (
               <button
                 key={type}
@@ -206,7 +304,7 @@ export default function AiAssistantPanel({ user, onOpenSettings }: Props) {
             onKeyDown={(e) => {
               if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
-                void send();
+                void sendMessage();
               }
             }}
             rows={2}

@@ -4,5 +4,6 @@ package com.satlas.api.dto;
 public enum AiContextType {
     NONE,
     TODAY_SCHEDULE,
-    ASSIGNMENTS
+    ASSIGNMENTS,
+    NOTEBOOK
 }

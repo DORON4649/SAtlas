@@ -26,7 +26,7 @@ export interface TimetableDraft {
 
 export type AiProvider = 'GEMINI' | 'OLLAMA_FALLBACK';
 
-export type AiContextType = 'NONE' | 'TODAY_SCHEDULE' | 'ASSIGNMENTS';
+export type AiContextType = 'NONE' | 'TODAY_SCHEDULE' | 'ASSIGNMENTS' | 'NOTEBOOK';
 
 export interface AiChatResponse {
   reply: string;
@@ -122,4 +122,24 @@ export interface GoogleSyncResponse {
   updatedCount: number;
   sharedCount: number;
   syncedAt: string;
+}
+
+export interface LectureNote {
+  id: number;
+  userId?: number;
+  subjectName: string;
+  title: string;
+  contentMarkdown: string;
+  tags: string | null;
+  isPinned: boolean;
+  createdAt: string | null;
+  updatedAt: string | null;
+}
+
+export interface LectureNoteInput {
+  subjectName?: string;
+  title?: string;
+  contentMarkdown?: string;
+  tags?: string | null;
+  isPinned?: boolean;
 }
