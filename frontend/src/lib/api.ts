@@ -3,8 +3,96 @@
 export const API_BASE_URL: string =
   (import.meta.env.VITE_API_BASE_URL as string | undefined)?.replace(/\/$/, '') ?? 'http://localhost:8080';
 
-/** Discord OAuth2 ログイン開始 URL（Spring Security が Discord へリダイレクト） */
-export const DISCORD_LOGIN_URL = `${API_BASE_URL}/oauth2/authorization/discord`;
+/** Web ブラウザ版 Discord OAuth2 ログイン開始 URL */
+export const DISCORD_WEB_LOGIN_URL = `${API_BASE_URL}/api/auth/discord/login?platform=web`;
+
+/** Desktop (Tauri) 版 Discord OAuth2 ログイン開始 URL */
+export const DISCORD_DESKTOP_LOGIN_URL = `${API_BASE_URL}/api/auth/discord/login?platform=desktop`;
+
+/** 後方互換エイリアス */
+export const DISCORD_LOGIN_URL = DISCORD_WEB_LOGIN_URL;
+
+export const AUTH_TOKEN_STORAGE_KEY = 'satlas_auth_jwt';
+
+export function getAuthToken(): string | null {
+  try {
+    return localStorage.getItem(AUTH_TOKEN_STORAGE_KEY);
+  } catch {
+    return null;
+  }
+}
+
+export function setAuthToken(token: string): void {
+  try {
+    localStorage.setItem(AUTH_TOKEN_STORAGE_KEY, token);
+  } catch {
+    /* ignore storage quota errors */
+  }
+}
+
+export function clearAuthToken(): void {
+  try {
+    localStorage.removeItem(AUTH_TOKEN_STORAGE_KEY);
+  } catch {
+    /* ignore */
+  }
+}
+
+export interface AuthCallbackParams {
+  token: string | null;
+  error: string | null;
+}
+
+/**
+ * URL 文字列（satlas://auth/callback?token=... や https://.../#auth_token=...）から
+ * JWT トークンまたはエラーコードを抽出する。
+ */
+export function extractAuthCallbackParams(urlStr: string): AuthCallbackParams {
+  try {
+    const parsed = new URL(urlStr);
+    const queryToken = parsed.searchParams.get('token');
+    const queryError = parsed.searchParams.get('error');
+    if (queryToken || queryError) {
+      return { token: queryToken, error: queryError };
+    }
+    const rawHash = parsed.hash.replace(/^#/, '');
+    if (rawHash.includes('auth_token=') || rawHash.includes('auth_error=')) {
+      const hashParams = new URLSearchParams(rawHash);
+      return {
+        token: hashParams.get('auth_token'),
+        error: hashParams.get('auth_error'),
+      };
+    }
+  } catch {
+    /* URL パース失敗時は無視 */
+  }
+  return { token: null, error: null };
+}
+
+/**
+ * ページロード時の URL ハッシュ（#auth_token=... / #auth_error=...）を消費して
+ * localStorage へ保存し、アドレスバーから機密トークンを消去する。
+ * App.tsx のハッシュルーティング初期化より先にモジュールロード時に 1 回実行する。
+ */
+export function consumeAuthTokenFromHash(): AuthCallbackParams {
+  if (typeof window === 'undefined') return { token: null, error: null };
+  const rawHash = window.location.hash.replace(/^#/, '');
+  if (!rawHash.includes('auth_token=') && !rawHash.includes('auth_error=')) {
+    return { token: null, error: null };
+  }
+  const params = new URLSearchParams(rawHash);
+  const token = params.get('auth_token');
+  const error = params.get('auth_error');
+  if (token) {
+    setAuthToken(token);
+  }
+  // アドレスバーに JWT を残さない
+  window.history.replaceState(null, '', window.location.pathname + window.location.search);
+  return { token, error };
+}
+
+/** 初回ロード時にハッシュから自動抽出した結果（React マウント前にトークンを確保） */
+export const INITIAL_AUTH_CALLBACK: AuthCallbackParams = consumeAuthTokenFromHash();
 
 export class ApiError extends Error {
   readonly status: number;
@@ -31,11 +119,20 @@ export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise
     headers.set('Content-Type', 'application/json');
   }
 
+  const token = getAuthToken();
+  if (token && !headers.has('Authorization')) {
+    headers.set('Authorization', `Bearer ${token}`);
+  }
+
   const res = await fetch(`${API_BASE_URL}${path}`, {
     ...init,
     headers,
-    credentials: 'include', // Discord ログインのセッション Cookie を送る
+    credentials: 'include', // セッション Cookie 認証との併用も維持
   });
+
+  if (res.status === 401 && token) {
+    clearAuthToken();
+  }
 
   if (!res.ok) {
     let message = `${res.status} ${res.statusText}`;

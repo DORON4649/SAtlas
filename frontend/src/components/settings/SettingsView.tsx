@@ -30,7 +30,7 @@ import {
   WifiOff,
 } from 'lucide-react';
 import type { AuthState } from '../../hooks/useAuth';
-import { DISCORD_LOGIN_URL, api, errorMessage } from '../../lib/api';
+import { api, errorMessage } from '../../lib/api';
 import {
   OFFLINE_GEMINI_KEY_STORAGE,
   type AiProviderPriority,
@@ -45,6 +45,12 @@ import {
   type LocalRunnerConfig,
 } from '../../lib/codeRunner';
 import type { PageBackground } from '../../lib/oneNoteModel';
+import {
+  checkForDesktopUpdate,
+  installDesktopUpdateAndRelaunch,
+  isTauriDesktop,
+  type UpdateCheckResult,
+} from '../../lib/tauriUpdater';
 import type { AiChatResponse, CurrentUser, LectureNote } from '../../types';
 
 interface Props {
@@ -52,6 +58,7 @@ interface Props {
   onUpdateSettings: (patch: Partial<AppSettings>) => void;
   auth: AuthState;
   onRefreshAuth: () => Promise<void>;
+  onLoginWithDiscord: () => void;
   onLogout: () => void;
   leftPaneOpen: boolean;
   rightPaneOpen: boolean;
@@ -80,6 +87,7 @@ export default function SettingsView({
   onUpdateSettings,
   auth,
   onRefreshAuth,
+  onLoginWithDiscord,
   onLogout,
   leftPaneOpen,
   rightPaneOpen,
@@ -114,6 +122,54 @@ export default function SettingsView({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [backupStatus, setBackupStatus] = useState<{ ok: boolean; text: string } | null>(null);
   const [paneSavedToast, setPaneSavedToast] = useState(false);
+
+  // デスクトップ自動アップデート
+  const isDesktop = isTauriDesktop();
+  const [updateBusy, setUpdateBusy] = useState<'idle' | 'checking' | 'installing'>('idle');
+  const [updateInfo, setUpdateInfo] = useState<UpdateCheckResult | null>(null);
+  const [updateProgress, setUpdateProgress] = useState<number | null>(null);
+  const [updateMessage, setUpdateMessage] = useState<{ ok: boolean; text: string } | null>(null);
+
+  const handleCheckUpdate = async () => {
+    if (!isDesktop) {
+      setUpdateMessage({ ok: true, text: 'Web ブラウザ版で実行中です（自動アップデートは Desktop アプリ版で利用できます）' });
+      return;
+    }
+    setUpdateBusy('checking');
+    setUpdateMessage(null);
+    try {
+      const res = await checkForDesktopUpdate();
+      setUpdateInfo(res);
+      setUpdateMessage(
+        res.available
+          ? { ok: true, text: `新しいバージョン v${res.version} が利用可能です！` }
+          : { ok: true, text: 'お使いの SAtlas Desktop は最新バージョンです。' },
+      );
+    } catch (e) {
+      setUpdateMessage({
+        ok: false,
+        text: `アップデート確認に失敗しました: ${e instanceof Error ? e.message : String(e)}`,
+      });
+    } finally {
+      setUpdateBusy('idle');
+    }
+  };
+
+  const handleInstallUpdate = async () => {
+    if (!updateInfo?.update) return;
+    setUpdateBusy('installing');
+    setUpdateProgress(0);
+    setUpdateMessage(null);
+    try {
+      await installDesktopUpdateAndRelaunch(updateInfo.update, setUpdateProgress);
+    } catch (e) {
+      setUpdateMessage({
+        ok: false,
+        text: `アップデートの適用に失敗しました: ${e instanceof Error ? e.message : String(e)}`,
+      });
+      setUpdateBusy('idle');
+    }
+  };
 
   const hasGeminiKey = offline ? Boolean(localGeminiKey) : Boolean(user?.hasGeminiApiKey);
   const maskedGeminiKey = offline
@@ -452,13 +508,14 @@ export default function SettingsView({
                 ログアウト
               </button>
             ) : (
-              <a
-                href={DISCORD_LOGIN_URL}
+              <button
+                type="button"
+                onClick={onLoginWithDiscord}
                 className="inline-flex items-center gap-1.5 rounded-lg bg-[#5865F2] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#4752C4]"
               >
                 <LogIn className="h-3.5 w-3.5" />
                 Discord でログイン
-              </a>
+              </button>
             )}
           </div>
         </div>
@@ -820,6 +877,60 @@ export default function SettingsView({
             }`}
           >
             {backupStatus.text}
+          </div>
+        )}
+      </section>
+
+      {/* 7. デスクトップアプリ・自動アップデート */}
+      <section className={cardCls}>
+        <h2 className="flex items-center gap-2 text-sm font-semibold text-white">
+          <RefreshCw className="h-4 w-4 text-emerald-400" />
+          7. アプリのアップデート（GitHub Releases）
+        </h2>
+        <p className="text-[11px] leading-relaxed text-slate-400">
+          {isDesktop
+            ? 'Tauri Desktop 環境で動作中です。GitHub Releases から最新バージョンを確認し、ワンクリックで更新・再起動できます。'
+            : '現在は Web ブラウザ版で動作中です。Windows 向け Desktop アプリ版（Tauri v2）では自動アップデートとネイティブコード実行が利用できます。'}
+        </p>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            disabled={updateBusy !== 'idle'}
+            onClick={() => void handleCheckUpdate()}
+            className={btnCls}
+          >
+            {updateBusy === 'checking' ? (
+              <LoaderCircle className="h-3.5 w-3.5 animate-spin text-cyan-400" />
+            ) : (
+              <RefreshCw className="h-3.5 w-3.5 text-emerald-400" />
+            )}
+            アップデートを確認
+          </button>
+
+          {updateInfo?.available && updateInfo.update && (
+            <button
+              type="button"
+              disabled={updateBusy !== 'idle'}
+              onClick={() => void handleInstallUpdate()}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3.5 py-1.5 text-xs font-semibold text-white hover:bg-emerald-500 disabled:opacity-40"
+            >
+              {updateBusy === 'installing' && <LoaderCircle className="h-3.5 w-3.5 animate-spin" />}
+              {updateBusy === 'installing'
+                ? `ダウンロード中${updateProgress !== null ? ` (${updateProgress}%)` : '...'}`
+                : `v${updateInfo.version} をダウンロード＆再起動`}
+            </button>
+          )}
+        </div>
+
+        {updateMessage && (
+          <div
+            className={`rounded-lg border px-3 py-2 ${
+              updateMessage.ok
+                ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300'
+                : 'border-rose-500/30 bg-rose-500/10 text-rose-300'
+            }`}
+          >
+            {updateMessage.text}
           </div>
         )}
       </section>

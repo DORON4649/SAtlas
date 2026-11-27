@@ -29,12 +29,19 @@ public class CurrentUserService {
     private final UserRepository userRepository;
     private final SatlasProperties properties;
 
-    /** Discord でログイン済みのユーザー（フォールバックなし）。 */
+    /** Discord (JWT または OAuth2 セッション) でログイン済みのユーザー（フォールバックなし）。 */
     @Transactional(readOnly = true)
     public Optional<User> findAuthenticatedUser() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (auth != null && auth.isAuthenticated() && auth.getPrincipal() instanceof OAuth2User principal) {
-            return userRepository.findByDiscordId(principal.getName());
+        if (auth == null || !auth.isAuthenticated()) {
+            return Optional.empty();
+        }
+        Object principal = auth.getPrincipal();
+        if (principal instanceof User user) {
+            return userRepository.findById(user.getId());
+        }
+        if (principal instanceof OAuth2User oauthUser) {
+            return userRepository.findByDiscordId(oauthUser.getName());
         }
         return Optional.empty();
     }

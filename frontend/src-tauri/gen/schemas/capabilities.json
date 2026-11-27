@@ -1,0 +1,1 @@
+{"default":{"identifier":"default","description":"Default capabilities for SAtlas Desktop (core, updater, process, opener, deep-link)","local":true,"windows":["main"],"permissions":["core:default","updater:default","process:default","opener:default","deep-link:default"]}}

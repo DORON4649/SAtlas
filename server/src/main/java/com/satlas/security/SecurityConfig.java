@@ -7,6 +7,7 @@ import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.HttpStatusEntryPoint;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.security.web.authentication.logout.HttpStatusReturningLogoutSuccessHandler;
 import org.springframework.security.web.servlet.util.matcher.PathPatternRequestMatcher;
 
@@ -15,7 +16,8 @@ import com.satlas.config.SatlasProperties;
 /**
  * Spring Security 設定。
  * <ul>
- * <li>ログイン: {@code GET /oauth2/authorization/discord} → 成功後 frontend-url へリダイレクト</li>
+ * <li>Web / Desktop 共通 Discord OAuth2: {@code GET /api/auth/discord/login} → JWT 発行</li>
+ * <li>JWT 認証: {@code Authorization: Bearer <JWT>} を {@link JwtAuthenticationFilter} で検証</li>
  * <li>ログアウト: {@code POST /api/auth/logout}（204）</li>
  * <li>dev-mode=true の間は /api/** を未ログインでも許可（CurrentUserService が開発ユーザーへフォールバック）</li>
  * </ul>
@@ -26,6 +28,7 @@ public class SecurityConfig {
     @Bean
     SecurityFilterChain securityFilterChain(HttpSecurity http,
             DiscordOAuth2UserService discordOAuth2UserService,
+            JwtAuthenticationFilter jwtAuthenticationFilter,
             SatlasProperties properties) throws Exception {
 
         boolean devMode = properties.isDevMode();
@@ -33,15 +36,21 @@ public class SecurityConfig {
 
         http
                 .cors(Customizer.withDefaults())
-                // SPA からの JSON API は Cookie セッション + CORS で保護（本番化時は CSRF トークン導入を検討）
                 .csrf(csrf -> csrf.ignoringRequestMatchers("/api/**"))
                 .authorizeHttpRequests(auth -> {
-                    auth.requestMatchers("/oauth2/**", "/login/**", "/error", "/api/me", "/api/auth/**").permitAll();
+                    auth.requestMatchers(
+                            "/oauth2/**",
+                            "/login/**",
+                            "/error",
+                            "/api/me",
+                            "/api/auth/**",
+                            "/api/auth/discord/**").permitAll();
                     if (devMode) {
                         auth.requestMatchers("/api/**").permitAll();
                     }
                     auth.anyRequest().authenticated();
                 })
+                .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
                 // API は未認証時にログイン画面へリダイレクトせず 401 を返す
                 .exceptionHandling(ex -> ex.defaultAuthenticationEntryPointFor(
                         new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED),

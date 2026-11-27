@@ -261,6 +261,8 @@ export default function CodeExecutionCell({
 
   const runtimeLabel = (runtime: CodeRunResult['runtime']) => {
     switch (runtime) {
+      case 'tauri-native':
+        return 'Desktop Native (Rust)';
       case 'local-pc':
         return 'Local PC';
       case 'browser-wasm':
@@ -358,7 +360,7 @@ export default function CodeExecutionCell({
             )}
           </button>
 
-          {runnable && onOpenRunnerSettings && badge?.kind !== 'local-pc' && (
+          {runnable && onOpenRunnerSettings && badge?.kind !== 'local-pc' && badge?.kind !== 'tauri-native' && (
             <button
               type="button"
               onClick={onOpenRunnerSettings}

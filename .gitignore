@@ -1,0 +1,8 @@
+
+# Rust / Tauri build artifacts
+target/
+frontend/src-tauri/target/
+
+# Rust / Tauri build artifacts
+target/
+frontend/src-tauri/target/

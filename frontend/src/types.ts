@@ -61,11 +61,11 @@ export interface Memo {
 
 export interface CurrentUser {
   id: number;
-  discordId: string;
+  discordId: string | null;
   name: string;
   avatarUrl: string | null;
   email: string | null;
-  role: 'USER' | 'ADMIN';
+  role: 'USER' | 'MEMBER' | 'ADMIN';
   theme: string | null;
   language: string | null;
   prefecture: string | null;

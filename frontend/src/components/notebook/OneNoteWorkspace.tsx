@@ -682,7 +682,7 @@ export default function OneNoteWorkspace({
 
   if (!note) {
     return (
-      <div className="flex h-[calc(100vh-5.5rem)] flex-col items-center justify-center rounded-2xl border border-dashed border-slate-700 bg-slate-900/40 p-8 text-center">
+      <div className="flex h-full min-h-0 flex-1 flex-col items-center justify-center rounded-2xl border border-dashed border-slate-700 bg-slate-900/40 p-8 text-center">
         <BookOpen className="mb-3 h-10 w-10 text-indigo-400/70" />
         <h2 className="text-base font-semibold text-slate-200">講義ノートページを選択または作成</h2>
         <p className="mt-1 max-w-md text-xs leading-relaxed text-slate-400">
@@ -703,7 +703,7 @@ export default function OneNoteWorkspace({
   const allStrokes = activeStroke ? [...page.strokes, activeStroke] : page.strokes;
 
   return (
-    <div className="flex h-[calc(100vh-5.5rem)] flex-col overflow-hidden rounded-2xl border border-slate-800 bg-slate-900/90">
+    <div className="flex h-full min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-slate-800 bg-slate-900/90">
       {/* ページヘッダー */}
       <div
         style={{ borderTopColor: note.sectionColor || DEFAULT_SECTION_COLOR }}

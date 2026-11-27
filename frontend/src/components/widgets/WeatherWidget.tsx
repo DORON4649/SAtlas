@@ -77,12 +77,12 @@ export default function WeatherWidget({ isEditing }: { isEditing: boolean }) {
       </WidgetHeader>
 
       {weather ? (
-        <div className="mt-auto flex items-center justify-between">
-          <div className="flex items-center gap-3">
+        <div className="mt-auto flex min-w-0 flex-wrap items-center justify-between gap-2">
+          <div className="flex min-w-0 items-center gap-3">
             {weatherInfo(weather.code).icon}
-            <div>
+            <div className="min-w-0">
               <div className="text-2xl font-bold text-white">{weather.temp}°C</div>
-              <div className="text-xs text-slate-400">{weatherInfo(weather.code).label}</div>
+              <div className="truncate text-xs text-slate-400">{weatherInfo(weather.code).label}</div>
             </div>
           </div>
           <div className="space-y-1 text-right text-xs text-slate-400">

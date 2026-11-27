@@ -30,7 +30,7 @@ public class User {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false, unique = true, length = 32)
+    @Column(unique = true, length = 32)
     private String discordId;
 
     @Column(nullable = false, length = 100)

@@ -1,8 +1,10 @@
-// ---- ハイブリッドコード実行アダプター（Local PC WebSocket -> Browser WASM Pyodide -> 外部/ガイド） ----
+// ---- ハイブリッドコード実行アダプター（Tauri Native -> Local PC WS -> Browser WASM Pyodide -> ガイド） ----
+
+import { isTauriDesktop } from './tauriUpdater';
 
 export type CodeLanguage = 'python' | 'java' | 'c';
 
-export type CodeRuntimeKind = 'local-pc' | 'browser-wasm' | 'sandbox' | 'guide' | 'custom';
+export type CodeRuntimeKind = 'tauri-native' | 'local-pc' | 'browser-wasm' | 'sandbox' | 'guide' | 'custom';
 
 export interface CodeRunResult {
   ok: boolean;
@@ -131,6 +133,13 @@ export function registerCodeRunner(adapter: CodeRunnerAdapter | null): void {
       kind: CodeRuntimeKind;
       className: string;
     } {
+      if (isTauriDesktop()) {
+        return {
+          label: 'Desktop Native',
+          kind: 'tauri-native',
+          className: 'border-emerald-500/40 bg-emerald-500/15 text-emerald-300',
+        };
+      }
       if (localRunnerConnected) {
         return {
           label: 'Local PC',
@@ -357,6 +366,37 @@ json.dumps({"ok": _ok, "stdout": _out.getvalue(), "stderr": _err.getvalue()})
       }
       if (typeof window !== 'undefined' && typeof window.__SATLAS_CODE_RUNNER__ === 'function') {
         return window.__SATLAS_CODE_RUNNER__(language, code);
+      }
+
+      // 0. Tauri Desktop ネイティブ実行（WebSocket トークン不要・最優先）
+      if (isTauriDesktop()) {
+        try {
+          const { invoke } = await import('@tauri-apps/api/core');
+          const res = await invoke<{
+            ok: boolean;
+            stdout: string;
+            stderr: string;
+            exitCode: number;
+            durationMs: number;
+          }>('run_local_code', { language, code });
+          return {
+            ok: res.ok,
+            stdout: res.stdout,
+            stderr: res.stderr,
+            exitCode: res.exitCode,
+            durationMs: res.durationMs,
+            runtime: 'tauri-native',
+          };
+        } catch (e) {
+          return {
+            ok: false,
+            stdout: '',
+            stderr: e instanceof Error ? e.message : String(e),
+            exitCode: 1,
+            durationMs: Math.round(performance.now() - startedAt),
+            runtime: 'tauri-native',
+          };
+        }
       }
 
         // 1. ローカル PC WebSocket ブリッジ

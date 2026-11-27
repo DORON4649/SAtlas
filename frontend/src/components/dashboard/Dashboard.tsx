@@ -21,7 +21,7 @@ export default function Dashboard({ layouts, onLayoutChange, isEditing, timetabl
   const { width, containerRef, mounted } = useContainerWidth();
 
   const frame = (variant: 'default' | 'accent' = 'default') =>
-    `flex flex-col overflow-hidden rounded-2xl border p-4 transition ${
+    `flex min-w-0 flex-col overflow-hidden rounded-2xl border p-4 transition ${
       variant === 'accent' ? 'bg-gradient-to-br from-slate-900 to-blue-950/40' : 'bg-slate-900/90'
     } ${
       isEditing

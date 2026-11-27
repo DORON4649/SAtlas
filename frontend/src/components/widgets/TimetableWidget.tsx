@@ -64,17 +64,17 @@ export default function TimetableWidget({ isEditing, entries, source, onOpenImpo
         )}
       </div>
 
-      <div className="mt-2 flex items-center gap-2 text-[11px] text-slate-500">
-        <span>今日 {todayCount} コマ</span>
+      <div className="mt-2 flex min-w-0 flex-wrap items-center gap-2 text-[11px] text-slate-500">
+        <span className="shrink-0">今日 {todayCount} コマ</span>
         {isSample && (
-          <span className="rounded border border-slate-700 px-1.5 py-0.5 text-slate-400">
+          <span className="truncate rounded border border-slate-700 px-1.5 py-0.5 text-slate-400">
             {source === 'offline' ? 'サンプル（サーバー未接続）' : 'サンプル表示'}
           </span>
         )}
         <button
           type="button"
           onClick={onOpenImport}
-          className="ml-auto flex items-center gap-1 rounded-lg border border-blue-500/40 bg-blue-600/20 px-2.5 py-1 font-semibold text-blue-200 transition hover:bg-blue-600/40"
+          className="ml-auto flex shrink-0 items-center gap-1 rounded-lg border border-blue-500/40 bg-blue-600/20 px-2.5 py-1 font-semibold text-blue-200 transition hover:bg-blue-600/40"
         >
           <FileUp className="h-3.5 w-3.5" />
           PDFからAI取込

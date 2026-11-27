@@ -41,6 +41,12 @@ import {
   createEmptyPageContent,
   serializeOneNoteContent,
 } from './lib/oneNoteModel';
+import {
+  checkForDesktopUpdate,
+  installDesktopUpdateAndRelaunch,
+  isTauriDesktop,
+  type UpdateCheckResult,
+} from './lib/tauriUpdater';
 import type { LectureNote } from './types';
 
 const LEFT_PANE_KEY = 'satlas_left_pane_open';
@@ -51,14 +57,15 @@ function resolveInitialSection(settings: AppSettings): NavSection {
   if (settings.startupView !== 'last') {
     return settings.startupView;
   }
-  if (window.location.hash && window.location.hash.length > 1) {
-    return normalizeNavSection(window.location.hash);
+  const hash = window.location.hash;
+  if (hash && hash.length > 1 && !hash.includes('auth_token=') && !hash.includes('auth_error=')) {
+    return normalizeNavSection(hash);
   }
   return normalizeNavSection(loadNavState().section);
 }
 
 export default function App() {
-  const { auth, refresh: refreshAuth, logout } = useAuth();
+  const { auth, authError, clearAuthError, refresh: refreshAuth, loginWithDiscord, logout } = useAuth();
   const timetable = useTimetable();
   const { layouts, onLayoutChange, resetLayout, syncState } = useDashboardLayout();
 
@@ -114,6 +121,26 @@ export default function App() {
   const [aiSettingsOpen, setAiSettingsOpen] = useState(false);
   const [calendarRightTab, setCalendarRightTab] = useState<'calendar' | 'ai'>('calendar');
   const [loginError, setLoginError] = useState(() => new URLSearchParams(window.location.search).has('login_error'));
+  const [availableUpdate, setAvailableUpdate] = useState<UpdateCheckResult | null>(null);
+  const [updatingApp, setUpdatingApp] = useState(false);
+
+  // Tauri Desktop 起動時にバックグラウンドでアップデート確認
+  useEffect(() => {
+    if (!isTauriDesktop()) return;
+    let cancelled = false;
+    checkForDesktopUpdate()
+      .then((res) => {
+        if (!cancelled && res.available) {
+          setAvailableUpdate(res);
+        }
+      })
+      .catch(() => {
+        /* ネットワーク未接続時や未公開リリース時は静かにスキップ */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const setSection = useCallback((next: NavSection) => {
     setSectionState(next);
@@ -369,7 +396,7 @@ export default function App() {
     </div>
   );
 
-  const panel = 'flex h-[calc(100vh-7rem)] flex-col rounded-2xl border border-slate-800 bg-slate-900/90 p-4';
+  const panel = 'flex h-full min-h-0 flex-1 flex-col rounded-2xl border border-slate-800 bg-slate-900/90 p-4';
 
   const workspace = (() => {
     switch (section) {
@@ -433,6 +460,7 @@ export default function App() {
             onUpdateSettings={updateAppSettings}
             auth={auth}
             onRefreshAuth={refreshAuth}
+            onLoginWithDiscord={() => void loginWithDiscord()}
             onLogout={() => void logout()}
             leftPaneOpen={leftPaneOpen}
             rightPaneOpen={rightPaneOpen}
@@ -551,9 +579,10 @@ export default function App() {
   );
 
   return (
-    <div className="flex min-h-screen flex-col bg-slate-950 text-slate-100">
+    <div className="flex h-dvh w-full flex-col overflow-hidden bg-slate-950 text-slate-100">
       <AppHeader
         auth={auth}
+        onLoginWithDiscord={() => void loginWithDiscord()}
         onLogout={() => void logout()}
         activeSection={section}
         leftPaneOpen={leftPaneOpen}
@@ -569,14 +598,15 @@ export default function App() {
         onOpenAiSettings={() => setAiSettingsOpen(true)}
       />
 
-      {loginError && (
+      {(loginError || authError) && (
         <div className="flex items-center justify-between border-b border-rose-500/30 bg-rose-500/10 px-6 py-2 text-xs text-rose-400">
-          Discord ログインに失敗しました（指定サーバーへの参加が必要な場合があります）。
+          {authError ?? 'Discord ログインに失敗しました（指定サーバーへの参加が必要な場合があります）。'}
           <button
             type="button"
             className="underline"
             onClick={() => {
               setLoginError(false);
+              clearAuthError();
               window.history.replaceState(null, '', window.location.pathname + window.location.hash);
             }}
           >
@@ -591,6 +621,8 @@ export default function App() {
         onSectionChange={setSection}
         leftPaneOpen={leftPaneOpen}
         rightPaneOpen={rightPaneOpen}
+        resolvedTheme={resolvedTheme}
+        onToggleTheme={toggleThemeQuick}
         leftSubPane={
           section === 'notes' ? (
             <NotebookExplorer
@@ -630,6 +662,36 @@ export default function App() {
           onClose={() => setAiSettingsOpen(false)}
           onUpdated={refreshAuth}
         />
+      )}
+
+      {/* Tauri Desktop アップデート通知トースト */}
+      {availableUpdate?.available && availableUpdate.update && (
+        <div className="fixed bottom-4 right-4 z-50 flex max-w-sm items-center gap-3 rounded-xl border border-emerald-500/40 bg-slate-900/95 px-4 py-3 text-xs shadow-2xl backdrop-blur">
+          <div className="min-w-0 flex-1">
+            <div className="font-semibold text-emerald-300">SAtlas v{availableUpdate.version} が利用可能</div>
+            <div className="mt-0.5 text-[11px] text-slate-400">最新バージョンへ自動アップデートできます。</div>
+          </div>
+          <button
+            type="button"
+            disabled={updatingApp}
+            onClick={() => {
+              if (!availableUpdate.update) return;
+              setUpdatingApp(true);
+              void installDesktopUpdateAndRelaunch(availableUpdate.update).catch(() => setUpdatingApp(false));
+            }}
+            className="shrink-0 rounded-lg bg-emerald-600 px-3 py-1.5 text-[11px] font-semibold text-white hover:bg-emerald-500 disabled:opacity-40"
+          >
+            {updatingApp ? '更新中...' : '更新＆再起動'}
+          </button>
+          <button
+            type="button"
+            onClick={() => setAvailableUpdate(null)}
+            className="text-slate-400 hover:text-white"
+            aria-label="閉じる"
+          >
+            ×
+          </button>
+        </div>
       )}
     </div>
   );

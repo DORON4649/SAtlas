@@ -100,7 +100,7 @@ export default function CalendarWorkspace({
   const openDetail = (ev: CalendarEvent) => setModalState({ open: true, event: ev, date: new Date(ev.startAt) });
 
   return (
-    <div className="flex h-[calc(100vh-5.5rem)] flex-col rounded-2xl border border-slate-800 bg-slate-900/90">
+    <div className="flex h-full min-h-0 flex-1 flex-col rounded-2xl border border-slate-800 bg-slate-900/90">
       {/* ツールバー */}
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 px-4 py-3">
         <div className="flex items-center gap-2">

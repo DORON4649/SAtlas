@@ -1,12 +1,12 @@
 import { KeyRound, Lock, LogIn, LogOut, Moon, RotateCcw, Sun, Unlock, WifiOff } from 'lucide-react';
 import type { AuthState } from '../../hooks/useAuth';
 import type { LayoutSyncState } from '../../hooks/useDashboardLayout';
-import { DISCORD_LOGIN_URL } from '../../lib/api';
 import SidebarToggleIcon from './SidebarToggleIcon';
 import type { NavSection } from './shellTypes';
 
 interface Props {
   auth: AuthState;
+  onLoginWithDiscord: () => void;
   onLogout: () => void;
   activeSection: NavSection;
   leftPaneOpen: boolean;
@@ -31,6 +31,7 @@ const SYNC_LABEL: Record<LayoutSyncState, string> = {
 
 export default function AppHeader({
   auth,
+  onLoginWithDiscord,
   onLogout,
   activeSection,
   leftPaneOpen,
@@ -46,7 +47,7 @@ export default function AppHeader({
   onOpenAiSettings,
 }: Props) {
   return (
-    <header className="sticky top-0 z-40 flex h-14 items-center justify-between gap-3 border-b border-slate-800 bg-slate-900/80 px-4 backdrop-blur md:px-6">
+    <header className="z-40 flex h-14 shrink-0 items-center justify-between gap-3 border-b border-slate-800 bg-slate-900/80 px-4 backdrop-blur md:px-6">
       {/* ロゴ ＋ 左サイドバー開閉 */}
       <div className="flex items-center gap-2.5">
         <button
@@ -164,13 +165,14 @@ export default function AppHeader({
                   DEV
                 </span>
               )}
-              <a
-                href={DISCORD_LOGIN_URL}
+              <button
+                type="button"
+                onClick={onLoginWithDiscord}
                 className="flex items-center gap-1.5 rounded-lg bg-[#5865F2] px-3 py-1.5 text-xs font-semibold text-white shadow-md shadow-indigo-500/20 transition-colors hover:bg-[#4752C4]"
               >
                 <LogIn className="h-3.5 w-3.5" />
                 <span className="hidden sm:inline">Discordでログイン</span>
-              </a>
+              </button>
             </>
           )
         )}
