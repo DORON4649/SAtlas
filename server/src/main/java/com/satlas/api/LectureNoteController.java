@@ -29,13 +29,14 @@ public class LectureNoteController {
     private final CurrentUserService currentUserService;
     private final LectureNoteService lectureNoteService;
 
-    /** 本人の講義ノート一覧を取得（科目名・キーワード絞り込み対応）。 */
+    /** 本人の講義ノート一覧を取得（科目名・セクション名・キーワード絞り込み対応）。 */
     @GetMapping
     public List<LectureNoteResponse> list(
             @RequestParam(required = false) String subjectName,
+            @RequestParam(required = false) String sectionName,
             @RequestParam(required = false) String keyword) {
         Long userId = currentUserService.requireUser().getId();
-        return lectureNoteService.list(userId, subjectName, keyword);
+        return lectureNoteService.list(userId, subjectName, sectionName, keyword);
     }
 
     @PostMapping

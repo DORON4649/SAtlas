@@ -128,9 +128,10 @@ export interface LectureNote {
   id: number;
   userId?: number;
   subjectName: string;
+  sectionName: string;
+  sectionColor: string;
   title: string;
-  contentMarkdown: string;
-  tags: string | null;
+  contentJson: string;
   isPinned: boolean;
   createdAt: string | null;
   updatedAt: string | null;
@@ -138,8 +139,9 @@ export interface LectureNote {
 
 export interface LectureNoteInput {
   subjectName?: string;
+  sectionName?: string;
+  sectionColor?: string;
   title?: string;
-  contentMarkdown?: string;
-  tags?: string | null;
+  contentJson?: string;
   isPinned?: boolean;
 }

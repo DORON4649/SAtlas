@@ -3,7 +3,122 @@
 @import "react-resizable/css/styles.css";
 @import "katex/dist/katex.min.css";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
+:root {
+  --satlas-bg: #0b1120;
+  --satlas-surface: #0f172a;
+  --satlas-surface-muted: #1e293b;
+  --satlas-border: #1e293b;
+  --satlas-text: #f8fafc;
+  --satlas-text-muted: #94a3b8;
+  --satlas-canvas-line: rgba(148, 163, 184, 0.14);
+  --satlas-canvas-grid: rgba(148, 163, 184, 0.1);
+}
+
+html.light {
+  --satlas-bg: #f1f5f9;
+  --satlas-surface: #ffffff;
+  --satlas-surface-muted: #e2e8f0;
+  --satlas-border: #cbd5e1;
+  --satlas-text: #0f172a;
+  --satlas-text-muted: #475569;
+  --satlas-canvas-line: rgba(15, 23, 42, 0.12);
+  --satlas-canvas-grid: rgba(15, 23, 42, 0.08);
+}
+
 body {
-  background-color: #0b1120;
-  color: #f8fafc;
+  background-color: var(--satlas-bg);
+  color: var(--satlas-text);
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.katex-display {
+  margin: 0.25rem 0 !important;
+}
+
+/* ---- ライトモード用サーフェス・文字カラートークン（既存の dark 基調コンポーネントを綺麗に反転） ---- */
+html.light .bg-slate-950,
+html.light .bg-slate-950\/70,
+html.light .bg-slate-950\/60,
+html.light .bg-slate-950\/80,
+html.light .bg-slate-950\/90,
+html.light .bg-slate-950\/50,
+html.light .bg-slate-950\/40,
+html.light .bg-slate-950\/30 {
+  background-color: #f1f5f9 !important;
+}
+
+html.light .bg-slate-900,
+html.light .bg-slate-900\/95,
+html.light .bg-slate-900\/90,
+html.light .bg-slate-900\/80,
+html.light .bg-slate-900\/60,
+html.light .bg-slate-900\/50,
+html.light .bg-slate-900\/40 {
+  background-color: #ffffff !important;
+}
+
+html.light .bg-slate-800,
+html.light .bg-slate-800\/80,
+html.light .bg-slate-800\/70,
+html.light .bg-slate-800\/60,
+html.light .bg-slate-800\/50,
+html.light .bg-slate-800\/40 {
+  background-color: #e2e8f0 !important;
+}
+
+html.light .border-slate-800,
+html.light .border-slate-800\/90,
+html.light .border-slate-800\/80,
+html.light .border-slate-700,
+html.light .border-slate-700\/90,
+html.light .border-slate-700\/80 {
+  border-color: #cbd5e1 !important;
+}
+
+html.light .text-slate-100,
+html.light .text-slate-200 {
+  color: #0f172a !important;
+}
+
+html.light .text-slate-300 {
+  color: #334155 !important;
+}
+
+html.light .text-slate-400,
+html.light .text-slate-500 {
+  color: #64748b !important;
+}
+
+html.light .text-white:not([class*="bg-blue-600"]):not([class*="bg-indigo-600"]):not([class*="bg-emerald-600"]):not([class*="bg-violet-600"]):not([class*="bg-rose-600"]):not([class*="bg-amber-600"]):not([class*="bg-gradient-"]):not([class*="bg-[#5865F2]"]) {
+  color: #0f172a !important;
+}
+
+html.light .hover\:bg-slate-800:hover,
+html.light .hover\:bg-slate-700:hover {
+  background-color: #cbd5e1 !important;
+}
+
+/* ライトモードでも VS Code Dark+ コードブロック内部の配色は鮮明に維持 */
+html.light .satlas-code-editor {
+  background-color: #1e1e1e !important;
+  color: #d4d4d4 !important;
+  border-color: #94a3b8 !important;
+}
+html.light .satlas-code-editor .satlas-code-header {
+  background-color: #252526 !important;
+  border-color: #334155 !important;
+}
+html.light .satlas-code-editor .satlas-code-header select,
+html.light .satlas-code-editor .satlas-code-header input,
+html.light .satlas-code-editor .satlas-code-header button:not(.bg-emerald-600) {
+  background-color: #334155 !important;
+  color: #e2e8f0 !important;
+  border-color: #475569 !important;
+}
+html.light .satlas-code-editor .satlas-code-gutter {
+  background-color: #1e1e1e !important;
+  color: #858585 !important;
+  border-color: #334155 !important;
 }

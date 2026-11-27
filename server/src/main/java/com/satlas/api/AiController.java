@@ -124,30 +124,36 @@ public class AiController {
     private void appendNotebookContext(StringBuilder sb, User user, AiChatRequest req) {
         LectureNote ownedNote = lectureNoteService.findOwned(user.getId(), req.noteId()).orElse(null);
         String subjectName = ownedNote != null ? ownedNote.getSubjectName() : null;
+        String sectionName = ownedNote != null ? ownedNote.getSectionName() : null;
         String title = (req.noteTitle() != null && !req.noteTitle().isBlank())
                 ? req.noteTitle().trim()
                 : (ownedNote != null ? ownedNote.getTitle() : null);
-        String content = (req.noteContent() != null && !req.noteContent().isBlank())
+        String rawContent = (req.noteContent() != null && !req.noteContent().isBlank())
                 ? req.noteContent()
-                : (ownedNote != null ? ownedNote.getContentMarkdown() : null);
+                : (ownedNote != null ? ownedNote.getContentJson() : null);
+        String extracted = lectureNoteService.extractReadableContent(rawContent);
 
-        sb.append("\n【添付コンテキスト：開いている講義ノート】\n");
-        if ((title == null || title.isBlank()) && (content == null || content.isBlank())) {
+        sb.append("\n【添付コンテキスト：開いている講義ノートページ】\n");
+        if ((title == null || title.isBlank()) && (extracted == null || extracted.isBlank())) {
             sb.append("ノートの内容が添付されていません。\n");
             return;
         }
         if (subjectName != null && !subjectName.isBlank()) {
-            sb.append("科目: ").append(subjectName).append("\n");
+            sb.append("科目ノートブック: ").append(subjectName);
+            if (sectionName != null && !sectionName.isBlank()) {
+                sb.append(" / セクション: ").append(sectionName);
+            }
+            sb.append("\n");
         }
         if (title != null && !title.isBlank()) {
-            sb.append("タイトル: ").append(title).append("\n");
+            sb.append("ページタイトル: ").append(title).append("\n");
         }
-        if (content != null && !content.isBlank()) {
-            String trimmed = content.length() > MAX_NOTE_CONTEXT_CHARS
-                    ? content.substring(0, MAX_NOTE_CONTEXT_CHARS) + "\n...(省略)"
-                    : content;
-            sb.append("本文:\n").append(trimmed).append("\n");
+        if (extracted != null && !extracted.isBlank()) {
+            String trimmed = extracted.length() > MAX_NOTE_CONTEXT_CHARS
+                    ? extracted.substring(0, MAX_NOTE_CONTEXT_CHARS) + "\n...(省略)"
+                    : extracted;
+            sb.append("ページ内容:\n").append(trimmed).append("\n");
         }
-        sb.append("上記の講義ノート（数式やコードセルを含む）を踏まえて、要約・解説・確認問題作成などの質問に丁寧に回答してください。\n");
+        sb.append("上記の講義ノート（テキスト・数式・コードセルを含む）を踏まえて、要約・解説・確認問題作成などの質問に丁寧に回答してください。\n");
     }
 }

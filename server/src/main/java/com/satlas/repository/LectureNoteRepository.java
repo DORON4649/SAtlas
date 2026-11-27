@@ -17,15 +17,17 @@ public interface LectureNoteRepository extends JpaRepository<LectureNote, Long> 
             select n from LectureNote n
             where n.userId = :userId
               and (:subjectName is null or n.subjectName = :subjectName)
+              and (:sectionName is null or n.sectionName = :sectionName)
               and (:keyword is null
                    or lower(n.title) like lower(concat('%', :keyword, '%'))
                    or lower(n.subjectName) like lower(concat('%', :keyword, '%'))
-                   or lower(coalesce(n.tags, '')) like lower(concat('%', :keyword, '%'))
-                   or lower(n.contentMarkdown) like lower(concat('%', :keyword, '%')))
+                   or lower(n.sectionName) like lower(concat('%', :keyword, '%'))
+                   or lower(n.contentJson) like lower(concat('%', :keyword, '%')))
             order by n.isPinned desc, n.updatedAt desc
             """)
     List<LectureNote> searchByUser(
             @Param("userId") Long userId,
             @Param("subjectName") String subjectName,
+            @Param("sectionName") String sectionName,
             @Param("keyword") String keyword);
 }

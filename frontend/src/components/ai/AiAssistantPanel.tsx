@@ -4,16 +4,17 @@ import {
   Bot,
   CalendarDays,
   ClipboardList,
-  Code2,
+  Code,
   Cpu,
   FileText,
-  HelpCircle,
   KeyRound,
+  ListChecks,
   LoaderCircle,
   Send,
   Sparkles,
 } from 'lucide-react';
 import { api, errorMessage } from '../../lib/api';
+import { extractNoteTextForAi } from '../../lib/oneNoteModel';
 import type { AiChatResponse, AiContextType, AiProvider, CurrentUser, LectureNote } from '../../types';
 
 interface Props {
@@ -39,19 +40,19 @@ const BASE_CONTEXT_CHIPS: { type: Exclude<AiContextType, 'NONE' | 'NOTEBOOK'>; l
 
 const NOTE_QUICK_PROMPTS: { label: string; prompt: string; icon: typeof FileText }[] = [
   {
-    label: 'ノートの要約',
-    prompt: 'この講義ノートの要点を箇条書きで分かりやすく要約してください。',
+    label: 'ページの要約',
+    prompt: 'この講義ノートページの要点を箇条書きで分かりやすく要約してください。',
     icon: FileText,
   },
   {
     label: '数式・コード解説',
-    prompt: 'この講義ノートに含まれる数式やコードセルの意味・動作をステップごとに解説してください。',
-    icon: Code2,
+    prompt: 'この講義ノートページに含まれる数式やコードセルの意味・動作をステップごとに解説してください。',
+    icon: Code,
   },
   {
     label: '確認クイズ作成',
-    prompt: 'この講義ノートの内容から理解度確認クイズを3問（解答と解説付き）作成してください。',
-    icon: HelpCircle,
+    prompt: 'この講義ノートページの内容から理解度確認クイズを3問（解答と解説付き）作成してください。',
+    icon: ListChecks,
   },
 ];
 
@@ -102,7 +103,7 @@ export default function AiAssistantPanel({ user, onOpenSettings, activeNote = nu
       if (targetContext === 'NOTEBOOK' && activeNote) {
         payload.noteId = activeNote.id;
         payload.noteTitle = activeNote.title;
-        payload.noteContent = activeNote.contentMarkdown;
+        payload.noteContent = extractNoteTextForAi(activeNote);
       }
 
       const res = await api.post<AiChatResponse>('/api/ai/chat', payload);
@@ -274,7 +275,7 @@ export default function AiAssistantPanel({ user, onOpenSettings, activeNote = nu
               }`}
             >
               <BookOpen className="h-3 w-3" />
-              開いているノートを含める
+              開いているページを含める
             </button>
           )}
           {BASE_CONTEXT_CHIPS.map(({ type, label, icon: Icon }) => {

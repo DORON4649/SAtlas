@@ -5,5 +5,6 @@ public enum AiContextType {
     NONE,
     TODAY_SCHEDULE,
     ASSIGNMENTS,
+    /** 開いている講義ノートページ（noteId または noteContent） */
     NOTEBOOK
 }
